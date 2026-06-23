@@ -1,10 +1,26 @@
 import streamlit as st
+import pandas as pd
 import joblib
 
+st.set_page_config(
+    page_title="Prediction",
+    layout="wide"
+)
+
 model = joblib.load("models/engagement_model.pkl")
+
+st.title("Engagement Prediction")
+
+# =====================================
+# MANUAL PREDICTION
+# =====================================
+
+st.subheader("Manual Prediction")
+
 col1, col2 = st.columns(2)
 
 with col1:
+
     views = st.number_input(
         "Views",
         min_value=0,
@@ -24,6 +40,7 @@ with col1:
     )
 
 with col2:
+
     comments = st.number_input(
         "Comments",
         min_value=0,
@@ -54,39 +71,65 @@ if st.button("Predict Engagement Score"):
         retention_rate
     ]])
 
-    predicted_score = prediction[0]
-
-    st.success(
-        f"Predicted Engagement Score: {predicted_score:.2f}"
+    st.metric(
+        "Predicted Engagement Score",
+        f"{prediction[0]:.2f}"
     )
 
-    st.subheader("Recommendations")
+st.divider()
 
-    if retention_rate < 60:
-        st.warning(
-            "Retention rate is low. Improve content quality and audience interaction."
+# =====================================
+# CSV PREDICTION
+# =====================================
+
+st.subheader("Batch Prediction Using CSV")
+
+uploaded_file = st.file_uploader(
+    "Upload CSV File",
+    type=["csv"]
+)
+
+if uploaded_file is not None:
+
+    data = pd.read_csv(uploaded_file)
+
+    required_columns = [
+        "views",
+        "watch_time",
+        "likes",
+        "comments",
+        "shares",
+        "retention_rate"
+    ]
+
+    if all(col in data.columns for col in required_columns):
+
+        predictions = model.predict(
+            data[required_columns]
         )
 
-    if comments < 100:
-        st.warning(
-            "Encourage viewers to comment more during the stream."
-        )
+        data["predicted_engagement_score"] = predictions
 
-    if shares < 50:
-        st.warning(
-            "Promote content sharing to increase reach."
-        )
-
-    if likes < 500:
-        st.warning(
-            "Encourage viewers to like the stream."
-        )
-
-    if (
-        retention_rate >= 75
-        and likes >= 500
-        and comments >= 100
-    ):
         st.success(
-            "Excellent engagement performance."
+            "Predictions generated successfully!"
+        )
+
+        st.dataframe(
+            data.head(),
+            use_container_width=True
+        )
+
+        csv = data.to_csv(index=False)
+
+        st.download_button(
+            label="Download Prediction Results",
+            data=csv,
+            file_name="predictions.csv",
+            mime="text/csv"
+        )
+
+    else:
+
+        st.error(
+            "CSV must contain: views, watch_time, likes, comments, shares, retention_rate"
         )
